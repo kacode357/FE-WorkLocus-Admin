@@ -1,5 +1,5 @@
 // app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata } from "next"; 
 import { Geist, Geist_Mono } from "next/font/google";
 import { Inter } from "next/font/google";
 import { UserProvider } from "@/contexts/user-context";
@@ -26,10 +26,12 @@ export const metadata: Metadata = {
   description: "Ứng dụng quán lý chấm công thông minh",
   icons: {
     icon: [
-      { url: "/images/logo.png", type: "image/png" },
-      { url: "/images/logo.png", rel: "shortcut icon", type: "image/png" },
+      // THAY ĐỔI Ở ĐÂY
+      { url: "/images/logo.png?v=1", type: "image/png" },
+      { url: "/images/logo.png?v=1", rel: "shortcut icon", type: "image/png" },
     ],
-    apple: "/images/logo.png",
+    // VÀ CẢ ĐÂY NỮA
+    apple: "/images/logo.png?v=1",
   },
 };
 
@@ -46,8 +48,6 @@ export default function RootLayout({
         <UserProvider>
           {children}
         </UserProvider>
-        
-        {/* THAY ĐỔI Ở DÒNG NÀY */}
         <Toaster richColors position="top-center" />
       </body>
     </html>
