@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Package, ClipboardList, Wallet, BarChart4, Search } from "lucide-react";
+import { Users, Package, ClipboardList, Wallet, Search } from "lucide-react"; // Bỏ BarChart4 vì không dùng nữa
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+// Bỏ các imports liên quan đến chart
+// import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { PieChart, Pie, Cell } from "recharts";
+// Bỏ PieChart, Pie, Cell
+// import { PieChart, Pie, Cell } from "recharts";
 import DashboardService from "@/services/dashboard.services";
 import type { DashboardStats } from "@/services/dashboard.services";
 
@@ -15,9 +17,8 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
-// Định nghĩa màu sắc cho biểu đồ - TONE MÀU CÓ ĐỘ TƯƠNG PHẢN CAO HƠN
-// Mày có thể chỉnh sửa các mã màu HEX này để đạt được hiệu ứng mong muốn
-const CHART_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA800', '#C70039']; // Đỏ san hô, Xanh ngọc, Xanh da trời, Cam sáng, Đỏ sẫm
+// Mảng màu biểu đồ không cần nữa vì không dùng biểu đồ
+// const CHART_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA800', '#C70039'];
 
 export default function AdminDashboardPage() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -27,7 +28,6 @@ export default function AdminDashboardPage() {
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Hàm fetch bảng lương có thể tái sử dụng
     const fetchPayrolls = useCallback(async (keyword: string, page: number) => {
         setIsPayrollLoading(true);
         try {
@@ -44,8 +44,11 @@ export default function AdminDashboardPage() {
                 }
             });
 
-            if (payrollResponse.ok) {
-                setPayrolls(payrollResponse.data.records);
+            if (payrollResponse && payrollResponse.ok) {
+                setPayrolls(payrollResponse.data?.records || []);
+            } else {
+                setPayrolls([]);
+                console.warn("API payroll/search trả về không OK hoặc không có dữ liệu:", payrollResponse);
             }
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu bảng lương:", error);
@@ -55,18 +58,21 @@ export default function AdminDashboardPage() {
         }
     }, []);
 
-    // useEffect để fetch dữ liệu dashboard và bảng lương ban đầu
     useEffect(() => {
         const fetchDashboardData = async () => {
             setIsLoading(true);
             try {
                 const statsResponse = await DashboardService.getDashboardStats();
-                if (statsResponse.ok) {
+                if (statsResponse && statsResponse.ok) {
                     setStats(statsResponse.data);
+                } else {
+                    setStats(null);
+                    console.warn("API dashboard-stats trả về không OK hoặc không có dữ liệu:", statsResponse);
                 }
                 await fetchPayrolls('', 1);
             } catch (error) {
                 console.error("Lỗi khi tải dữ liệu dashboard tổng thể:", error);
+                setStats(null);
             } finally {
                 setIsLoading(false);
             }
@@ -75,7 +81,6 @@ export default function AdminDashboardPage() {
         fetchDashboardData();
     }, [fetchPayrolls]);
 
-    // useEffect để gọi API khi searchTerm thay đổi
     useEffect(() => {
         const handler = setTimeout(() => {
             setCurrentPage(1);
@@ -87,80 +92,51 @@ export default function AdminDashboardPage() {
         };
     }, [searchTerm, fetchPayrolls]);
 
-    const chartData = stats ? [
-        { name: 'diligence', label: 'Chuyên cần', value: stats.totalDiligenceBonusPaid },
-        { name: 'performance', label: 'Hiệu suất', value: stats.totalPerformanceBonusPaid },
-        { name: 'other', label: 'Khác', value: stats.totalOtherBonusPaid },
-    ].filter(item => item.value > 0) : [];
+    // chartData và CustomTooltip không cần nữa vì không dùng biểu đồ
+    // const chartData = stats ? [
+    //     { name: 'diligence', label: 'Chuyên cần', value: stats.totalDiligenceBonusPaid || 0 },
+    //     { name: 'performance', label: 'Hiệu suất', value: stats.totalPerformanceBonusPaid || 0 },
+    //     { name: 'other', label: 'Khác', value: stats.totalOtherBonusPaid || 0 },
+    // ].filter(item => item.value > 0) : [];
 
-    // Component CustomTooltip mới để định dạng tooltip
-    const CustomTooltip = ({ active, payload }: any) => {
-        if (active && payload && payload.length) {
-            const data = payload[0].payload;
-            return (
-                <div className="rounded-md border bg-white p-2 text-sm shadow-md">
-                    <p className="font-semibold text-gray-800">{data.label}:</p>
-                    <p className="text-gray-700">{formatCurrency(data.value)}</p>
-                </div>
-            );
-        }
-        return null;
-    };
+    // const CustomTooltip = ({ active, payload }: any) => {
+    //     if (active && payload && payload.length) {
+    //         const data = payload[0].payload;
+    //         return (
+    //             <div className="rounded-md border bg-white p-2 text-sm shadow-md">
+    //                 <p className="font-semibold text-gray-800">{data.label}:</p>
+    //                 <p className="text-gray-700">{formatCurrency(data.value)}</p>
+    //             </div>
+    //         );
+    //     }
+    //     return null;
+    // };
 
     if (isLoading) {
         return <DashboardSkeleton />;
     }
 
     if (!stats) {
-        return <div className="text-center">Không thể tải dữ liệu dashboard.</div>;
+        return <div className="text-center p-8 text-red-600">Không thể tải dữ liệu dashboard. Vui lòng thử lại sau.</div>;
     }
 
     return (
-        <div className="space-y-4 ">
+        <div className="space-y-4">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Tổng Nhân viên" value={stats.employeeCount + stats.adminCount} icon={<Users className="text-orange-500" />} />
-                <StatCard title="Dự án" value={stats.projectCount} icon={<Package className="text-orange-500" />} />
-                <StatCard title="Công việc" value={stats.taskCount} icon={<ClipboardList className="text-orange-500" />} />
-                <StatCard title="Tổng lương đã trả" value={formatCurrency(stats.totalSalaryPaid)} icon={<Wallet className="text-orange-500" />} />
+                <StatCard title="Tổng Nhân viên" value={(stats.employeeCount || 0) + (stats.adminCount || 0)} icon={<Users className="text-orange-500" />} />
+                <StatCard title="Dự án" value={stats.projectCount || 0} icon={<Package className="text-orange-500" />} />
+                <StatCard title="Công việc" value={stats.taskCount || 0} icon={<ClipboardList className="text-orange-500" />} />
+                <StatCard title="Tổng lương đã trả" value={formatCurrency(stats.totalSalaryPaid || 0)} icon={<Wallet className="text-orange-500" />} />
             </div>
 
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-5">
-                <Card className="lg:col-span-3 border-orange-200">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-orange-600">
-                            <BarChart4 className="h-5 w-5 text-orange-500"/>
-                            Cơ cấu Thưởng/Phụ cấp
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ChartContainer
-                            config={{
-                                diligence: { label: 'Chuyên cần', color: CHART_COLORS[0] },
-                                performance: { label: 'Hiệu suất', color: CHART_COLORS[1] },
-                                other: { label: 'Khác', color: CHART_COLORS[2] },
-                            }}
-                            className="mx-auto aspect-square h-[300px]"
-                        >
-                            <PieChart>
-                                {/* SỬ DỤNG CUSTOM TOOLTIP Ở ĐÂY */}
-                                <ChartTooltip content={<CustomTooltip />} />
-                                <Pie data={chartData} dataKey="value" nameKey="label" innerRadius={60} strokeWidth={5}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <ChartLegend content={({ payload }) => <ChartLegendContent payload={payload} nameKey="label" />} className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center" />
-                            </PieChart>
-                        </ChartContainer>
-                    </CardContent>
-                </Card>
-
-                <Card className="lg:col-span-2 border-orange-200">
+            {/* BỐ CỤC MỚI: Nếu không có biểu đồ, phần này sẽ chỉ còn bảng lương */}
+            {/* Thay vì grid lg:grid-cols-5, giờ chỉ cần lg:col-span-12 hoặc không cần grid nếu chỉ có 1 phần tử chính */}
+            <div className="grid grid-cols-1"> {/* Đổi sang grid 1 cột nếu chỉ còn 1 card chính */}
+                <Card className="lg:col-span-1 border-orange-200"> {/* Card bảng lương sẽ chiếm toàn bộ chiều rộng */}
                     <CardHeader>
                         <CardTitle className="text-orange-600">Bảng lương gần đây</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {/* Thanh tìm kiếm */}
                         <div className="relative mb-4">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                             <Input
@@ -170,13 +146,11 @@ export default function AdminDashboardPage() {
                                 className="pl-9 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-orange-300 focus:border-orange-500"
                             />
                         </div>
-                        {/* End Thanh tìm kiếm */}
 
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="text-orange-500">Nhân viên</TableHead>
-                                    <TableHead className="text-right text-orange-500">Thực lãnh</TableHead>
+                                    <TableHead className="text-orange-500">Nhân viên</TableHead><TableHead className="text-right text-orange-500">Thực lãnh</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -189,9 +163,8 @@ export default function AdminDashboardPage() {
                                         <TableRow key={p._id}>
                                             <TableCell>
                                                 <div className="font-medium text-gray-800">{p.user_id?.full_name || 'N/A'}</div>
-                                                <div className="text-xs text-muted-foreground">Tháng {p.month}/{p.year}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-semibold text-green-600">{formatCurrency(p.total_salary)}</TableCell>
+                                                <div className="text-xs text-muted-foreground">Tháng {p.month || 'N/A'}/{p.year || 'N/A'}</div>
+                                            </TableCell><TableCell className="text-right font-semibold text-green-600">{formatCurrency(p.total_salary || 0)}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
@@ -234,9 +207,9 @@ function DashboardSkeleton() {
                 <Skeleton className="h-28" />
                 <Skeleton className="h-28" />
             </div>
-            <div className="grid gap-8 md:grid-cols-2 lg:col-span-5">
-                <Skeleton className="lg:col-span-3 h-[400px]" />
-                <Skeleton className="lg:col-span-2 h-[400px]" />
+            {/* Skeleton cho phần không còn biểu đồ, giờ chỉ còn 1 cột */}
+            <div className="grid grid-cols-1">
+                <Skeleton className="h-[400px]" /> {/* Skeleton cho Card bảng lương */}
             </div>
         </div>
     );
