@@ -1,20 +1,40 @@
 import { defaultAxiosInstance } from '@/config/axios.config';
 
 export interface Workplace {
-    _id?: string; // id có thể không cần khi tạo/update
+    _id?: string;
     name: string;
-    latitude: number;  // API trả về number
-    longitude: number; // API trả về number
+    latitude: number;
+    longitude: number;
+    is_deleted?: boolean;
 }
 
-const updateWorkplaceApi = async (payload: Workplace) => {
-    const response = await defaultAxiosInstance.put('/api/admin/workplace', payload);
+const createWorkplaceApi = async (payload: { name: string; latitude: number; longitude: number }) => {
+    const response = await defaultAxiosInstance.post('/api/admin/workplaces', payload);
     return response.data;
 };
-const getWorkplacesApi = async () => {
-    const response = await defaultAxiosInstance.get('/api/admin/workplace');
+
+const searchWorkplacesApi = async (payload: {
+    pageInfo: {
+        pageNum: number;
+        pageSize: number;
+    };
+}) => {
+    const response = await defaultAxiosInstance.post('/api/admin/workplaces/search', payload);
     return response.data;
 };
+
+const updateWorkplaceApi = async (workplaceId: string, updateData: Partial<Workplace>) => {
+    const response = await defaultAxiosInstance.patch(`/api/admin/workplaces/${workplaceId}`, updateData);
+    return response.data;
+};
+
+const deleteWorkplaceApi = async (workplaceId: string) => {
+    const response = await defaultAxiosInstance.delete(`/api/admin/workplaces/${workplaceId}`);
+    return response.data;
+};
+
+
+// === API cho Admin Users (giữ nguyên các hàm mày đã có) ===
 const searchAdminUsersApi = async (payload: {
     searchCondition: {
         keyword: string;
@@ -85,9 +105,15 @@ const updateUserSalaryApi = async (userId: string, payload: { base_salary_per_da
     const response = await defaultAxiosInstance.put(`/api/admin/users/${userId}/salary`, payload);
     return response.data;
 };
+
 export {
-    getWorkplacesApi,
+    // Workplace APIs
+    createWorkplaceApi,
+    searchWorkplacesApi,
     updateWorkplaceApi,
+    deleteWorkplaceApi,
+
+    // Admin Users APIs
     updateUserSalaryApi,
     deleteAdminUserApi,
     blockAdminUserApi,
@@ -97,5 +123,5 @@ export {
     createAdminApi,
     createTeamLeaderApi,
     createProjectManagerApi,
-     searchAdminUsersApi,
+    searchAdminUsersApi,
 };
