@@ -20,7 +20,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [errors, setErrors] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { setUser } = useUser();
 
   const validateForm = () => {
@@ -45,23 +45,37 @@ export default function LoginPage() {
       const credentials = { email, password };
       const loginData = await LoginUserApi(credentials);
 
-      if (loginData.status == 200) {
+      if (loginData.status === 200) {
         toast.success(loginData.message || "Đăng nhập thành công!");
 
         localStorage.setItem("accessToken", loginData.data.accessToken);
-        
+
         if (rememberMe) {
           localStorage.setItem("refreshToken", loginData.data.refreshToken);
         } else {
           localStorage.removeItem("refreshToken");
         }
-        
+
         const currentUserData = await GetCurrentUserApi();
         if (currentUserData.status === 200) {
-          setUser(currentUserData.data); 
+          // Kiểm tra role của người dùng ở đây
+          if (currentUserData.data.role === "admin") { // Giả định role admin là 'admin'
+            setUser(currentUserData.data);
+            router.push("/admin");
+          } else {
+            // Nếu không phải admin, hiển thị lỗi và xóa token
+            toast.error("Bạn không có quyền truy cập trang quản trị.");
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("refreshToken"); // Xóa cả refresh token nếu có
+            setUser(null); // Clear user data in context
+          }
+        } else {
+          // Xử lý trường hợp không lấy được thông tin người dùng
+          toast.error(currentUserData.message || "Không thể lấy thông tin người dùng.");
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          setUser(null);
         }
-
-        router.push("/admin");
 
       } else {
         toast.error(loginData.message || "Thông tin đăng nhập không hợp lệ.");
@@ -69,6 +83,11 @@ export default function LoginPage() {
 
     } catch (error: any) {
       console.error("Lỗi đăng nhập cuối cùng:", error);
+      // Xử lý lỗi từ API LoginUserApi hoặc GetCurrentUserApi
+      toast.error(error.message || "Đã xảy ra lỗi trong quá trình đăng nhập. Vui lòng thử lại.");
+      localStorage.removeItem("accessToken"); // Đảm bảo xóa token nếu có lỗi sau khi set
+      localStorage.removeItem("refreshToken");
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +120,7 @@ export default function LoginPage() {
           <motion.div variants={itemVariants} className="lg:hidden text-center mb-8">
             <Image src="/images/logo.png" alt="WorkLocus Logo" width={64} height={64} className="mx-auto" />
           </motion.div>
-          
+
           <motion.div variants={itemVariants} className="text-left mb-8">
             <h1 className="text-3xl font-bold tracking-tight text-primary">Chào mừng trở lại!</h1>
             <p className="mt-2 text-muted-foreground">Đăng nhập để vào trang quản trị WorkLocus</p>
@@ -148,10 +167,10 @@ export default function LoginPage() {
 
             <motion.div variants={itemVariants} className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <input 
-                    type="checkbox" 
-                    id="remember-me" 
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary" 
+                <input
+                    type="checkbox"
+                    id="remember-me"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     disabled={isLoading}
@@ -160,7 +179,7 @@ export default function LoginPage() {
               </div>
               <a href="#" className="font-medium text-primary hover:underline underline-offset-4">Quên mật khẩu?</a>
             </motion.div>
-            
+
             <motion.div variants={itemVariants}>
               <motion.div whileHover={{ scale: isLoading ? 1 : 1.03 }} whileTap={{ scale: isLoading ? 1 : 0.98 }}>
                 <Button type="submit" className="w-full text-lg h-12 font-bold tracking-wide" disabled={isLoading}>
@@ -171,7 +190,7 @@ export default function LoginPage() {
           </form>
         </motion.div>
       </div>
-      
+
       <div className="hidden lg:flex lg:items-center lg:justify-center bg-primary/10 p-12">
         <motion.div className="text-center" initial="hidden" animate="visible" variants={imageVariants}>
           <Image src="/images/logo.png" alt="WorkLocus Admin Logo" width={120} height={120} priority className="mx-auto" />
