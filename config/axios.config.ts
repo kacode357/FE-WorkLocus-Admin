@@ -186,7 +186,7 @@ const handleErrorByToast = (errors: AxiosError<ErrorResponse>) => {
     }
 
     if (message === "Cart null!." || errors.response?.status === 404) {
-        console.error("Lỗi 404 hoặc giỏ hàng trống, không hiển thị toast.");
+        console.error("Lỗi 404 hoặc giỏ hàng trống, không hiển thị toast");
         return Promise.reject(data?.errors ?? { message });
     }
 
