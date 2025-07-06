@@ -77,14 +77,12 @@ export default function LoginPage() {
           setUser(null);
         }
 
-      } else {
-        toast.error(loginData.message || "Thông tin đăng nhập không hợp lệ.");
-      }
+      } 
 
     } catch (error: any) {
       console.error("Lỗi đăng nhập cuối cùng:", error);
       // Xử lý lỗi từ API LoginUserApi hoặc GetCurrentUserApi
-      toast.error(error.message || "Đã xảy ra lỗi trong quá trình đăng nhập. Vui lòng thử lại.");
+     
       localStorage.removeItem("accessToken"); // Đảm bảo xóa token nếu có lỗi sau khi set
       localStorage.removeItem("refreshToken");
       setUser(null);

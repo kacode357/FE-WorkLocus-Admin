@@ -60,7 +60,19 @@ defaultAxiosInstance.interceptors.response.use(
     async (err: AxiosError<ErrorResponse>) => {
         const originalRequest = err.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+        // Kiểm tra nếu lỗi là 401 và đây KHÔNG phải là request retry HOẶC request đến endpoint login
+        // Nếu nó là lỗi 401 từ endpoint login, thì không cần refresh token
+        // Mà là xử lý lỗi đăng nhập sai tài khoản/mật khẩu
+        const isLoginEndpoint = originalRequest.url?.includes('/api/auth/login'); // Thay đổi đường dẫn này nếu endpoint login của mày khác
+        
         if (err.response?.status === 401 && !originalRequest._retry) {
+            // Nếu đây là lỗi 401 từ trang đăng nhập (do sai mật khẩu/username)
+            if (isLoginEndpoint) {
+                handleErrorByToast(err); // Hiển thị toast lỗi từ BE (sai tk/mk)
+                return Promise.reject(err);
+            }
+
+            // Đây là lỗi 401 không phải từ trang login, nghĩa là token có thể hết hạn
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
@@ -112,6 +124,7 @@ defaultAxiosInstance.interceptors.response.use(
             }
         }
 
+        // Với các lỗi khác 401 hoặc lỗi 401 đã được retry
         handleErrorByToast(err);
         return Promise.reject(err);
     }
