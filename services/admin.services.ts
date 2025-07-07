@@ -105,8 +105,12 @@ const updateUserSalaryApi = async (userId: string, payload: { base_salary_per_da
     const response = await defaultAxiosInstance.put(`/api/admin/users/${userId}/salary`, payload);
     return response.data;
 };
-
+const updateUserRoleApi = async (userId: string, payload: { role: string }) => {
+    const response = await defaultAxiosInstance.patch(`/api/admin/users/${userId}/role`, payload);
+    return response.data;
+};
 export {
+
     // Workplace APIs
     createWorkplaceApi,
     searchWorkplacesApi,
@@ -124,4 +128,5 @@ export {
     createTeamLeaderApi,
     createProjectManagerApi,
     searchAdminUsersApi,
+    updateUserRoleApi
 };

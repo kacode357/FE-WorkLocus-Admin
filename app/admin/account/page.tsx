@@ -11,14 +11,22 @@ import { searchAdminUsersApi } from "@/services/admin.services";
 import { CreateUserDialog } from "./components/create-user-dialog";
 import { UserTableActions } from "./components/user-table-actions";
 import { UserFilters } from "./components/user-filters";
+import { cn } from "@/lib/utils";
 
 type Role = "admin" | "employee" | "tl" | "pm";
 interface User {
-  _id: string; full_name: string; email: string; role: Role;
-  image_url: string | null; is_activated: boolean; created_at: string;
+  _id: string; 
+  full_name: string; 
+  email: string; 
+  role: Role;
+  image_url: string | null; 
+  is_activated: boolean; 
+  created_at: string;
+  base_salary_per_day?: number;
 }
 interface PaginationInfo {
-  currentPage: number; totalPages: number;
+  currentPage: number; 
+  totalPages: number;
 }
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -29,6 +37,18 @@ function useDebounce<T>(value: T, delay: number): T {
   }, [value, delay]);
   return debouncedValue;
 }
+
+const roleColorMap: Record<Role, string> = {
+    admin: "border-transparent bg-purple-100 text-purple-800 hover:bg-purple-100/80 dark:bg-purple-800/20 dark:text-purple-300",
+    pm: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+    tl: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    employee: "border-gray-200 dark:border-gray-700"
+};
+
+const statusColorMap = {
+    active: "border-transparent bg-green-100 text-green-800 dark:bg-green-800/20 dark:text-green-300",
+    inactive: "border-transparent bg-red-100 text-red-800 dark:bg-red-800/20 dark:text-red-300"
+};
 
 export default function AdminAccountPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -62,8 +82,11 @@ export default function AdminAccountPage() {
   }, [debouncedKeyword, filters.role, filters.status]);
 
   useEffect(() => {
-    if (currentPage !== 1) setCurrentPage(1);
-    else fetchUsers(1);
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      fetchUsers(1);
+    }
   }, [debouncedKeyword, filters.role, filters.status, fetchUsers]);
 
   useEffect(() => {
@@ -98,7 +121,7 @@ export default function AdminAccountPage() {
             <TableHeader><TableRow>
               <TableHead>Người dùng</TableHead><TableHead>Vai trò</TableHead>
               <TableHead>Trạng thái</TableHead><TableHead>Ngày tham gia</TableHead>
-              <TableHead><span className="sr-only">Hành động</span></TableHead>
+              <TableHead className="text-right">Hành động</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {isLoading ? Array.from({ length: 5 }).map((_, i) => (
@@ -114,10 +137,20 @@ export default function AdminAccountPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><Badge variant="outline">{user.role.toUpperCase()}</Badge></TableCell>
-                  <TableCell><Badge variant={user.is_activated ? 'default' : 'secondary'}>{user.is_activated ? "Hoạt động" : "Bị khóa"}</Badge></TableCell>
+                  <TableCell>
+                    {/* SỬA LẠI ĐÂY */}
+                    <Badge className={cn("font-semibold w-36 justify-center", roleColorMap[user.role])}>
+                        {user.role.toUpperCase()}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {/* SỬA LẠI ĐÂY */}
+                    <Badge className={cn("font-semibold w-28 justify-center", user.is_activated ? statusColorMap.active : statusColorMap.inactive)}>
+                        {user.is_activated ? "Hoạt động" : "Bị khóa"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{new Date(user.created_at).toLocaleDateString("vi-VN")}</TableCell>
-                  <TableCell><UserTableActions user={user} onActionComplete={() => fetchUsers(currentPage)} /></TableCell>
+                  <TableCell className="text-right"><UserTableActions user={user} onActionComplete={() => fetchUsers(currentPage)} /></TableCell>
                 </TableRow>
               )) : (
                 <TableRow><TableCell colSpan={5} className="h-24 text-center">Không có dữ liệu.</TableCell></TableRow>
