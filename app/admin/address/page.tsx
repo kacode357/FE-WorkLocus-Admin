@@ -196,13 +196,100 @@ export default function AddressPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Quản lý Địa điểm làm việc</h1>
-        <p className="text-muted-foreground">
-          Tạo mới, xem, chỉnh sửa và xóa các địa điểm làm việc của công ty.
-        </p>
+      <div className="flex justify-between items-center"> {/* Thêm flex và justify-between */}
+        <div>
+          <h1 className="text-2xl font-bold">Quản lý Địa điểm làm việc</h1>
+          <p className="text-muted-foreground">
+            Tạo mới, xem, chỉnh sửa và xóa các địa điểm làm việc của công ty.
+          </p>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => handleEditWorkplace(null as any)}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Thêm địa điểm mới
+            </Button>
+          </DialogTrigger>
+          <DialogContent
+            className="sm:max-w-[600px]"
+            onEscapeKeyDown={handleCloseDialog}
+            onPointerDownOutside={handleCloseDialog}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {editingWorkplace
+                  ? "Chỉnh sửa Địa điểm"
+                  : "Thêm Địa điểm mới"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingWorkplace
+                  ? "Cập nhật thông tin địa điểm này."
+                  : "Điền thông tin để tạo địa điểm mới."}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
+              >
+                <div className="space-y-2">
+                  <Label>Tìm kiếm địa chỉ</Label>
+                  <AddressSearchInput onAddressSelect={handleAddressSelect} />
+                </div>
+                <Separator />
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tên/Địa chỉ đầy đủ</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="latitude"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vĩ độ (Latitude)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="longitude"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Kinh độ (Longitude)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {editingWorkplace ? "Cập nhật Địa điểm" : "Tạo Địa điểm"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
-      ---
       <Card>
         <CardHeader>
           <CardTitle>Danh sách Địa điểm</CardTitle>
@@ -231,7 +318,6 @@ export default function AddressPage() {
                 {workplaces.length > 0 ? (
                   workplaces.map((workplace) => (
                     <TableRow key={workplace._id}>
-                      {/* SỬA TẠI ĐÂY: Thêm style để cắt ngắn tên địa điểm */}
                       <TableCell
                         className="font-medium max-w-[200px] whitespace-nowrap overflow-hidden text-ellipsis"
                         title={workplace.name} // Hiện full tên khi hover
@@ -337,86 +423,6 @@ export default function AddressPage() {
               <ChevronsRight className="h-4 w-4" />
             </Button>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => handleEditWorkplace(null as any)}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Thêm địa điểm mới
-              </Button>
-            </DialogTrigger>
-            <DialogContent
-              className="sm:max-w-[600px]"
-              onEscapeKeyDown={handleCloseDialog}
-              onPointerDownOutside={handleCloseDialog}
-            >
-              <DialogHeader>
-                <DialogTitle>
-                  {editingWorkplace
-                    ? "Chỉnh sửa Địa điểm"
-                    : "Thêm Địa điểm mới"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingWorkplace
-                    ? "Cập nhật thông tin địa điểm này."
-                    : "Điền thông tin để tạo địa điểm mới."}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onSubmit)}
-                  className="space-y-6"
-                >
-                  <div className="space-y-2">
-                    <Label>Tìm kiếm địa chỉ</Label>
-                    <AddressSearchInput onAddressSelect={handleAddressSelect} />
-                  </div>
-                  <Separator />
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tên/Địa chỉ đầy đủ</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="latitude"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Vĩ độ (Latitude)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="any" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="longitude"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Kinh độ (Longitude)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="any" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
         </CardFooter>
       </Card>
     </div>
