@@ -13,7 +13,7 @@ import { UserTableActions } from "./components/user-table-actions";
 import { UserFilters } from "./components/user-filters";
 import { cn } from "@/lib/utils";
 
-type Role = "admin" | "employee" | "tl" | "pm";
+type Role = "admin" | "employee" | "team_leader" | "project_manager";
 interface User {
   _id: string; 
   full_name: string; 
@@ -40,8 +40,8 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const roleColorMap: Record<Role, string> = {
     admin: "border-transparent bg-purple-100 text-purple-800 hover:bg-purple-100/80 dark:bg-purple-800/20 dark:text-purple-300",
-    pm: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-    tl: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    project_manager: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+    team_leader: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
     employee: "border-gray-200 dark:border-gray-700"
 };
 

@@ -39,7 +39,7 @@ const formSchema = z.object({
   full_name: z.string().min(2, "Tên phải có ít nhất 2 ký tự."),
   email: z.string().email("Email không hợp lệ."),
   password: z.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự."),
-  role: z.enum(["admin", "employee", "tl", "pm"], {
+  role: z.enum(["admin", "employee", "team_leader", "project_manager"], {
     required_error: "Vui lòng chọn vai trò.",
   }),
 });
@@ -77,8 +77,8 @@ export function CreateUserDialog({ onUserCreated }: CreateUserDialogProps) {
       const apiMap = {
         admin: adminServices.createAdminApi,
         employee: adminServices.createEmployeeApi,
-        tl: adminServices.createTeamLeaderApi,
-        pm: adminServices.createProjectManagerApi,
+        team_leader: adminServices.createTeamLeaderApi,
+        project_manager: adminServices.createProjectManagerApi,
       };
       
       const response = await apiMap[data.role](data);
@@ -149,8 +149,8 @@ export function CreateUserDialog({ onUserCreated }: CreateUserDialogProps) {
                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       <SelectItem value="employee">Employee</SelectItem>
-                      <SelectItem value="tl">Team Leader</SelectItem>
-                      <SelectItem value="pm">Project Manager</SelectItem>
+                      <SelectItem value="team_leader">Team Leader</SelectItem>
+                      <SelectItem value="project_manager">Project Manager</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>

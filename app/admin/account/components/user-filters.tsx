@@ -43,8 +43,8 @@ export function UserFilters({
             <SelectItem value="all">Tất cả vai trò</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="employee">Employee</SelectItem>
-            <SelectItem value="tl">Team Leader</SelectItem>
-            <SelectItem value="pm">Project Manager</SelectItem>
+            <SelectItem value="team_leader">Team Leader</SelectItem>
+            <SelectItem value="project_manager">Project Manager</SelectItem>
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={onStatusChange}>
