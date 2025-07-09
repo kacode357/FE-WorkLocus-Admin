@@ -1,12 +1,12 @@
 "use client";
 
-import { createContext, useState, ReactNode, Dispatch, SetStateAction, useContext, useEffect } from 'react';
+import { createContext, useState, ReactNode, Dispatch, SetStateAction, useContext, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { GetCurrentUserApi } from '@/services/auth.services';
 import { Loader2 } from 'lucide-react';
-import Cookies from 'js-cookie'; // <-- Dùng Cookies ở đây nữa
+import Cookies from 'js-cookie';
 
-// --- Interface User không đổi ---
+// --- Interfaces giữ nguyên ---
 interface User {
   _id: string;
   email: string;
@@ -15,7 +15,6 @@ interface User {
   image_url?: string;
 }
 
-// --- Interface UserContextType không đổi ---
 interface UserContextType {
   user: User | null;
   setUser: Dispatch<SetStateAction<User | null>>;
@@ -30,10 +29,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true); 
   const router = useRouter();
 
-  // --- THAY ĐỔI LOGIC TRONG USEEFFECT ---
+  // --- THAY ĐỔI 1: Bọc hàm logout trong useCallback để nó ổn định ---
+  // Điều này tránh các lỗi tiềm ẩn về "stale closure" và re-render không cần thiết
+  const logout = useCallback(() => {
+    setUser(null);
+    Cookies.remove("accessToken");
+    Cookies.remove("refreshToken");
+    router.push("/");
+  }, [router]); // router là dependency
+
   useEffect(() => {
     const fetchUserOnLoad = async () => {
-      // 1. Đọc token từ Cookie thay vì localStorage
       const token = Cookies.get("accessToken");
 
       if (!token) {
@@ -46,12 +52,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         if (response.status === 200) {
           setUser(response.data); 
         } else {
-          // Nếu API trả về status không phải 200, cũng coi như lỗi
-          throw new Error("Failed to fetch user with valid status");
+          // Ném lỗi tường minh hơn
+          throw new Error(`API returned status ${response.status}`);
         }
-      } catch (error) {
-        console.error("Token không hợp lệ hoặc hết hạn, tự động đăng xuất.", error);
-        // 2. Nếu có lỗi (token hết hạn), tự động gọi hàm logout để dọn dẹp
+      } catch (error: any) {
+        // --- THAY ĐỔI 2: In ra lỗi chi tiết để debug ---
+        console.error("LỖI TRONG USER-CONTEXT:", error);
+        // Nếu lỗi có response từ server (ví dụ: 401, 403), in nó ra
+        if (error.response) {
+            console.error("DATA LỖI TỪ SERVER:", error.response.data);
+        }
         logout();
       } finally {
         setIsLoading(false); 
@@ -59,15 +69,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchUserOnLoad();
-  }, []); // 3. Chỉ cần chạy 1 lần khi app load, không cần phụ thuộc vào pathname nữa
-
-  const logout = () => {
-    setUser(null);
-    // 4. Xóa token trong Cookie
-    Cookies.remove("accessToken");
-    Cookies.remove("refreshToken");
-    router.push("/");
-  };
+  }, [logout]); // Thêm logout vào dependency array
 
   return (
     <UserContext.Provider value={{ user, setUser, logout, isLoading }}>
