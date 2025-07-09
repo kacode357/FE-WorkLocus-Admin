@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { LoginUserApi, GetCurrentUserApi } from "@/services/auth.services";
 import { useUser } from "@/contexts/user-context";
+import Cookies from "js-cookie";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -45,46 +46,63 @@ export default function LoginPage() {
       const credentials = { email, password };
       const loginData = await LoginUserApi(credentials);
 
-      if (loginData.status === 200) {
-        toast.success(loginData.message || "Đăng nhập thành công!");
+      if (loginData.status !== 200) {
+        toast.error(loginData.message || "Email hoặc mật khẩu không chính xác.");
+        setIsLoading(false);
+        return;
+      }
+      
+      toast.success(loginData.message || "Đăng nhập thành công!");
 
-        localStorage.setItem("accessToken", loginData.data.accessToken);
+      Cookies.set("accessToken", loginData.data.accessToken, {
+        expires: 1,
+        secure: process.env.NODE_ENV === "production",
+      });
 
-        if (rememberMe) {
-          localStorage.setItem("refreshToken", loginData.data.refreshToken);
-        } else {
-          localStorage.removeItem("refreshToken");
-        }
+      if (rememberMe) {
+        Cookies.set("refreshToken", loginData.data.refreshToken, {
+          expires: 7,
+          secure: process.env.NODE_ENV === "production",
+        });
+      } else {
+        Cookies.remove("refreshToken");
+      }
 
-        const currentUserData = await GetCurrentUserApi();
-        if (currentUserData.status === 200) {
-          // Kiểm tra role của người dùng ở đây
-          if (currentUserData.data.role === "admin") { // Giả định role admin là 'admin'
-            setUser(currentUserData.data);
-            router.push("/admin");
+      const currentUserData = await GetCurrentUserApi();
+      if (currentUserData.status === 200) {
+        
+        const userRole = currentUserData.data.role;
+        const allowedRoles = ["admin", "project_manager"];
+
+        if (allowedRoles.includes(userRole)) {
+          setUser(currentUserData.data);
+          console.log(`Đăng nhập thành công với quyền ${userRole}:`, currentUserData.data);
+          
+          // --- THAY ĐỔI LOGIC CHUYỂN HƯỚNG Ở ĐÂY ---
+          if (userRole === "project_manager") {
+            router.push("/admin/timekeeping"); // PM vào thẳng trang chấm công
           } else {
-            // Nếu không phải admin, hiển thị lỗi và xóa token
-            toast.error("Bạn không có quyền truy cập trang quản trị.");
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken"); // Xóa cả refresh token nếu có
-            setUser(null); // Clear user data in context
+            router.push("/admin"); // Admin vào trang admin chung
           }
+
         } else {
-          // Xử lý trường hợp không lấy được thông tin người dùng
-          toast.error(currentUserData.message || "Không thể lấy thông tin người dùng.");
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
+          toast.error("Bạn không có quyền truy cập trang quản trị.");
+          Cookies.remove("accessToken");
+          Cookies.remove("refreshToken");
           setUser(null);
         }
-
-      } 
-
+      } else {
+        toast.error(currentUserData.message || "Không thể lấy thông tin người dùng.");
+        Cookies.remove("accessToken");
+        Cookies.remove("refreshToken");
+        setUser(null);
+      }
     } catch (error: any) {
       console.error("Lỗi đăng nhập cuối cùng:", error);
-      // Xử lý lỗi từ API LoginUserApi hoặc GetCurrentUserApi
-     
-      localStorage.removeItem("accessToken"); // Đảm bảo xóa token nếu có lỗi sau khi set
-      localStorage.removeItem("refreshToken");
+      // Xóa toast lỗi chung chung để ưu tiên hiển thị lỗi từ API (nếu có)
+      // toast.error("Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.");
+      Cookies.remove("accessToken");
+      Cookies.remove("refreshToken");
       setUser(null);
     } finally {
       setIsLoading(false);

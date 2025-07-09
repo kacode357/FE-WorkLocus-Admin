@@ -1,15 +1,12 @@
 import axios, { AxiosInstance, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { toast } from "sonner";
+import Cookies from "js-cookie"; // <-- THÊM THƯ VIỆN COOKIE
 
 // Lấy BASE_URL từ biến môi trường
-// Đảm bảo mày đã thêm NEXT_PUBLIC_BASE_URL_API="http://localhost:8080" vào file .env.local
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL_API;
 
-// Kiểm tra nếu BASE_URL chưa được định nghĩa (chỉ để đảm bảo an toàn thôi)
 if (!BASE_URL) {
     console.error("Lỗi: NEXT_PUBLIC_BASE_URL_API không được định nghĩa trong biến môi trường.");
-    // Mày có thể ném lỗi hoặc đặt một giá trị mặc định ở đây nếu muốn
-    // Ví dụ: throw new Error("Missing NEXT_PUBLIC_BASE_URL_API environment variable.");
 }
 
 interface ErrorResponse {
@@ -32,7 +29,7 @@ const processQueue = (error: AxiosError | null, token: string | null = null) => 
 };
 
 const defaultAxiosInstance: AxiosInstance = axios.create({
-    baseURL: BASE_URL, // Sử dụng biến môi trường
+    baseURL: BASE_URL,
     headers: {
         "content-type": "application/json; charset=UTF-8",
     },
@@ -40,9 +37,11 @@ const defaultAxiosInstance: AxiosInstance = axios.create({
     timeoutErrorMessage: "Kết nối quá hạn, vui lòng thử lại.",
 });
 
+// Interceptor gắn token vào mỗi request
 defaultAxiosInstance.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem("accessToken");
+        // <-- THAY ĐỔI: Đọc token từ Cookie
+        const token = Cookies.get("accessToken");
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -53,26 +52,21 @@ defaultAxiosInstance.interceptors.request.use(
     }
 );
 
+// Interceptor xử lý lỗi, đặc biệt là lỗi 401 (token hết hạn)
 defaultAxiosInstance.interceptors.response.use(
     (response: AxiosResponse) => {
         return response;
     },
     async (err: AxiosError<ErrorResponse>) => {
         const originalRequest = err.config as InternalAxiosRequestConfig & { _retry?: boolean };
-
-        // Kiểm tra nếu lỗi là 401 và đây KHÔNG phải là request retry HOẶC request đến endpoint login
-        // Nếu nó là lỗi 401 từ endpoint login, thì không cần refresh token
-        // Mà là xử lý lỗi đăng nhập sai tài khoản/mật khẩu
-        const isLoginEndpoint = originalRequest.url?.includes('/api/auth/login'); // Thay đổi đường dẫn này nếu endpoint login của mày khác
+        const isLoginEndpoint = originalRequest.url?.includes('/api/auth/login');
         
         if (err.response?.status === 401 && !originalRequest._retry) {
-            // Nếu đây là lỗi 401 từ trang đăng nhập (do sai mật khẩu/username)
             if (isLoginEndpoint) {
-                handleErrorByToast(err); // Hiển thị toast lỗi từ BE (sai tk/mk)
+                handleErrorByToast(err);
                 return Promise.reject(err);
             }
 
-            // Đây là lỗi 401 không phải từ trang login, nghĩa là token có thể hết hạn
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
@@ -91,20 +85,25 @@ defaultAxiosInstance.interceptors.response.use(
             originalRequest._retry = true;
             isRefreshing = true;
 
-            const refreshToken = localStorage.getItem("refreshToken");
+            // <-- THAY ĐỔI: Đọc refreshToken từ Cookie
+            const refreshToken = Cookies.get("refreshToken");
             if (!refreshToken) {
                 isRefreshing = false;
-                handleLogout();
+                handleLogout(); // Gọi hàm đăng xuất nếu không có refresh token
                 return Promise.reject(err);
             }
 
             try {
-                // Endpoint refresh token cũng sử dụng BASE_URL
                 const refreshResponse = await axios.post(`${BASE_URL}/api/auth/refresh-token`, { refreshToken });
 
                 if (refreshResponse.status === 200) {
                     const newAccessToken = refreshResponse.data.data.accessToken;
-                    localStorage.setItem("accessToken", newAccessToken);
+                    
+                    // <-- THAY ĐỔI: Lưu accessToken mới vào Cookie
+                    Cookies.set("accessToken", newAccessToken, {
+                        expires: 1,
+                        secure: process.env.NODE_ENV === "production",
+                    });
 
                     if (originalRequest.headers) {
                         originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
@@ -117,31 +116,35 @@ defaultAxiosInstance.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError as AxiosError, null);
                 console.error("Refresh token thất bại:", refreshError);
-                handleLogout();
+                handleLogout(); // Đăng xuất nếu refresh token cũng thất bại
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
             }
         }
 
-        // Với các lỗi khác 401 hoặc lỗi 401 đã được retry
         handleErrorByToast(err);
         return Promise.reject(err);
     }
 );
 
 const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+    // <-- THAY ĐỔI: Xóa token trong Cookie
+    Cookies.remove("accessToken");
+    Cookies.remove("refreshToken");
+    
+    // Chuyển hướng về trang chủ
     if (window.location.pathname !== "/") {
-      window.location.href = "/";
+        window.location.href = "/";
     }
     toast.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
 };
 
-// axiosWithoutLoading cũng sử dụng chung BASE_URL
+
+// ----- CÁC INSTANCE KHÁC CŨNG CẦN CẬP NHẬT TƯƠNG TỰ -----
+
 const axiosWithoutLoading: AxiosInstance = axios.create({
-    baseURL: BASE_URL, 
+    baseURL: BASE_URL,
     headers: {
         "content-type": "application/json; charset=UTF-8",
     },
@@ -151,7 +154,8 @@ const axiosWithoutLoading: AxiosInstance = axios.create({
 
 axiosWithoutLoading.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem("accessToken");
+        // <-- THAY ĐỔI: Đọc token từ Cookie
+        const token = Cookies.get("accessToken");
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -172,7 +176,9 @@ axiosWithoutLoading.interceptors.response.use(
     }
 );
 
+// Hàm handleErrorByToast không cần thay đổi
 const handleErrorByToast = (errors: AxiosError<ErrorResponse>) => {
+    // ... (giữ nguyên logic)
     const data = errors.response?.data;
     let message: string | undefined = data?.message ?? errors.message ?? "Đã có lỗi xảy ra";
 
@@ -184,16 +190,13 @@ const handleErrorByToast = (errors: AxiosError<ErrorResponse>) => {
             message = errorMessages.join(", ");
         }
     }
-
     if (message === "Cart null!." || errors.response?.status === 404) {
         console.error("Lỗi 404 hoặc giỏ hàng trống, không hiển thị toast");
         return Promise.reject(data?.errors ?? { message });
     }
-
     if (message) {
         toast.error(message);
     }
-
     return Promise.reject(data?.errors ?? { message });
 };
 

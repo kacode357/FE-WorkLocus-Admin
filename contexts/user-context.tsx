@@ -1,10 +1,12 @@
 "use client";
 
 import { createContext, useState, ReactNode, Dispatch, SetStateAction, useContext, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { GetCurrentUserApi } from '@/services/auth.services';
 import { Loader2 } from 'lucide-react';
+import Cookies from 'js-cookie'; // <-- Dùng Cookies ở đây nữa
 
+// --- Interface User không đổi ---
 interface User {
   _id: string;
   email: string;
@@ -13,6 +15,7 @@ interface User {
   image_url?: string;
 }
 
+// --- Interface UserContextType không đổi ---
 interface UserContextType {
   user: User | null;
   setUser: Dispatch<SetStateAction<User | null>>;
@@ -26,11 +29,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true); 
   const router = useRouter();
-  const pathname = usePathname();
 
+  // --- THAY ĐỔI LOGIC TRONG USEEFFECT ---
   useEffect(() => {
     const fetchUserOnLoad = async () => {
-      const token = localStorage.getItem("accessToken");
+      // 1. Đọc token từ Cookie thay vì localStorage
+      const token = Cookies.get("accessToken");
+
       if (!token) {
         setIsLoading(false);
         return;
@@ -40,24 +45,27 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         const response = await GetCurrentUserApi(); 
         if (response.status === 200) {
           setUser(response.data); 
-          if (pathname === "/") {
-            router.push("/admin");
-          }
+        } else {
+          // Nếu API trả về status không phải 200, cũng coi như lỗi
+          throw new Error("Failed to fetch user with valid status");
         }
       } catch (error) {
-        console.error("Không thể tự động đăng nhập:", error);
+        console.error("Token không hợp lệ hoặc hết hạn, tự động đăng xuất.", error);
+        // 2. Nếu có lỗi (token hết hạn), tự động gọi hàm logout để dọn dẹp
+        logout();
       } finally {
         setIsLoading(false); 
       }
     };
 
     fetchUserOnLoad();
-  }, [pathname, router]);
+  }, []); // 3. Chỉ cần chạy 1 lần khi app load, không cần phụ thuộc vào pathname nữa
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+    // 4. Xóa token trong Cookie
+    Cookies.remove("accessToken");
+    Cookies.remove("refreshToken");
     router.push("/");
   };
 
