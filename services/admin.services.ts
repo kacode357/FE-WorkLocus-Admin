@@ -7,7 +7,66 @@ export interface Workplace {
     longitude: number;
     is_deleted?: boolean;
 }
+export interface ProjectTaskStat {
+    _id: string;
+    name: string;
+    total_tasks: number;
+    done: number;
+    in_progress: number;
+    todo: number;
+    blocked: number; // Thêm status blocked
+    last_activity_date: string;
+}
 
+const getProjectTaskStatsApi = async (payload: {
+    searchCondition?: { keyword?: string };
+    pageInfo?: { pageNum?: number; pageSize?: number };
+}) => {
+    const response = await defaultAxiosInstance.post('/api/admin/dashboard/project-stats', payload);
+    return response.data;
+};
+
+
+// --- 2. API Lấy Giờ Làm Trung Bình Của Nhân Viên ---
+export interface EmployeeAvgHours {
+    _id: string;
+    full_name: string;
+    email: string;
+    role: string;
+    image_url: string | null;
+    average_hours: number;
+    total_days_worked: number;
+}
+
+const getEmployeeAverageHoursApi = async (payload: {
+    searchCondition?: { keyword?: string };
+    pageInfo?: { pageNum?: number; pageSize?: number };
+    date_from?: string;
+    date_to?: string;
+}) => {
+    const response = await defaultAxiosInstance.post('/api/admin/dashboard/employee-avg-hours', payload);
+    return response.data;
+};
+
+
+// --- 3. API Lấy Sức Khỏe Dự Án ---
+export interface ProjectHealth {
+    _id: string;
+    name: string;
+    status: string;
+    total_tasks: number;
+    completed_tasks: number;
+    member_count: number;
+    progress_percentage: number;
+}
+
+const getProjectsHealthApi = async (payload: {
+    searchCondition?: { keyword?: string; status?: string };
+    pageInfo?: { pageNum?: number; pageSize?: number };
+}) => {
+    const response = await defaultAxiosInstance.post('/api/admin/dashboard/projects-health', payload);
+    return response.data;
+};
 const createWorkplaceApi = async (payload: { name: string; latitude: number; longitude: number }) => {
     const response = await defaultAxiosInstance.post('/api/admin/workplaces', payload);
     return response.data;
@@ -110,7 +169,9 @@ const updateUserRoleApi = async (userId: string, payload: { role: string }) => {
     return response.data;
 };
 export {
-
+    getProjectTaskStatsApi,
+    getEmployeeAverageHoursApi,
+    getProjectsHealthApi,
     // Workplace APIs
     createWorkplaceApi,
     searchWorkplacesApi,

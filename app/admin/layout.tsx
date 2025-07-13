@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-    Home, Menu, Package2, User, Loader2, LogOut, ChevronLeft, 
-    ClipboardList, CalendarCheck, Award, CircleDollarSign, MapPin 
+import {
+    Home, Menu, Package2, User, Loader2, LogOut, ChevronLeft,
+    ClipboardList, CalendarCheck, Award, CircleDollarSign, MapPin,
+    Wallet
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,12 +44,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
         <div
             className={cn(
-                "grid min-h-screen w-full transition-[grid-template-columns] duration-300 ease-in-out", 
+                "grid min-h-screen w-full transition-[grid-template-columns] duration-300 ease-in-out",
                 isSidebarOpen ? "md:grid-cols-[220px_1fr]" : "md:grid-cols-[60px_1fr]"
             )}
         >
             <div className="hidden border-r bg-muted/40 md:block">
-                <div className="flex flex-col h-full"> 
+                <div className="flex flex-col h-full">
                     <div className={cn("flex h-14 items-center border-b lg:h-[60px]", isSidebarOpen ? "px-4 lg:px-6" : "px-3")}>
                         <Link href="/admin" className={cn("flex w-full items-center gap-2 font-semibold overflow-hidden", !isSidebarOpen && "justify-center")}>
                             <Package2 className="h-6 w-6 flex-shrink-0" />
@@ -57,15 +58,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             </span>
                         </Link>
                     </div>
-                    
+
                     <div className="flex-1 overflow-y-auto py-2">
                         {/* Truyền user vào MainNav để nó biết role là gì */}
                         <MainNav isSidebarOpen={isSidebarOpen} />
                     </div>
                 </div>
             </div>
-            
-            <div className="flex flex-col"> 
+
+            <div className="flex flex-col">
                 <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
                     <Sheet>
                         <SheetTrigger asChild>
@@ -111,7 +112,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </DropdownMenu>
                     </div>
                 </header>
-                
+
                 <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
                     {children}
                 </main>
@@ -135,17 +136,18 @@ function MainNav({ isSidebarOpen }: { isSidebarOpen: boolean }) {
     // 1. Định nghĩa TẤT CẢ các mục menu có thể có, kèm theo danh sách 'roles' được xem
     const allNavItems = [
         { href: "/admin", label: "Tổng quát", icon: Home, roles: ["admin"] },
-         { href: "/admin/timekeeping", label: "Chấm công", icon: CalendarCheck, roles: ["admin", "project_manager"] },
+        { href: "/admin/timekeeping", label: "Chấm công", icon: CalendarCheck, roles: ["admin", "project_manager"] },
         { href: "/admin/project", label: "Dự án", icon: Package2, roles: ["admin", "project_manager"] },
         { href: "/admin/task", label: "Công việc", icon: ClipboardList, roles: ["admin", "project_manager"] },
-       
+
         // Các mục chỉ dành cho admin
         { href: "/admin/account", label: "Tài khoản", icon: User, roles: ["admin"] },
         { href: "/admin/bonus", label: "Mức thưởng", icon: Award, roles: ["admin"] },
         { href: "/admin/payroll", label: "Tính lương", icon: CircleDollarSign, roles: ["admin"] },
+        { href: "/admin/payroll-history", label: "Lịch sử lương", icon: Wallet, roles: ["admin"] },
         { href: "/admin/address", label: "Địa chỉ", icon: MapPin, roles: ["admin"] },
     ];
-    
+
     // 2. Lọc ra danh sách các mục menu mà user hiện tại được phép xem
     // user chắc chắn không null ở đây vì đã có check ở component cha
     const visibleNavItems = allNavItems.filter(item => item.roles.includes(user!.role));
@@ -177,7 +179,7 @@ function MobileNav() {
                 <Package2 className="h-6 w-6" />
                 <span>WorkLocus</span>
             </Link>
-            <MainNav isSidebarOpen={true}/>
+            <MainNav isSidebarOpen={true} />
         </nav>
     );
 }

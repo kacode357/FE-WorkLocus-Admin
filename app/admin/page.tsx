@@ -1,283 +1,287 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Users, Package, ClipboardList, Wallet, Search, X } from "lucide-react";
+import { useState, useEffect, useCallback, type FC, type ReactNode } from "react";
+import { useDebounce } from "use-debounce";
+import { TrendingUp, BarChart2, Users } from "lucide-react";
+
+// UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
-import DashboardService from "@/services/dashboard.services";
-import type { DashboardStats } from "@/services/dashboard.services";
+// Services & Types
+import { getProjectsHealthApi, getProjectTaskStatsApi, getEmployeeAverageHoursApi } from "@/services/admin.services";
+import type { ProjectHealth, ProjectTaskStat, EmployeeAvgHours } from "@/services/admin.services";
 
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-};
 
-export default function AdminDashboardPage() {
-    const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [payrolls, setPayrolls] = useState<any[]>([]);
+// =================================================================
+// --- CUSTOM HOOK ĐỂ TÁI SỬ DỤNG LOGIC GỌI API ---
+// =================================================================
+function useDashboardData<TData, TFilters>(
+    fetcher: (filters: TFilters) => Promise<any>, 
+    initialFilters: TFilters, 
+    debounceTime: number = 500
+) {
+    const [data, setData] = useState<TData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isPayrollLoading, setIsPayrollLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState<string>('');
-    const [currentPage, setCurrentPage] = useState(1);
+    const [filters, setFilters] = useState<TFilters>(initialFilters);
+    const [debouncedFilters] = useDebounce(filters, debounceTime);
 
-    const [isPopupOpen, setIsPopupOpen] = useState(false);
-    const [selectedPayroll, setSelectedPayroll] = useState<any | null>(null);
-
-    const fetchPayrolls = useCallback(async (keyword: string, page: number) => {
-        setIsPayrollLoading(true);
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
         try {
-            const now = new Date();
-            const payrollResponse = await DashboardService.searchRecentPayrolls({
-                searchCondition: {
-                    keyword: keyword,
-                    month: now.getMonth() + 1,
-                    year: now.getFullYear()
-                },
-                pageInfo: {
-                    pageNum: page,
-                    pageSize: 5
-                }
-            });
-
-            if (payrollResponse && payrollResponse.ok) {
-                setPayrolls(payrollResponse.data?.records || []);
+            const res = await fetcher(debouncedFilters);
+            if (res.ok) {
+                setData(res.data.records);
             } else {
-                setPayrolls([]);
-                console.warn("API payroll/search trả về không OK hoặc không có dữ liệu:", payrollResponse);
+                setData([]);
             }
         } catch (error) {
-            console.error("Lỗi khi tải dữ liệu bảng lương:", error);
-            setPayrolls([]);
+            console.error("Failed to fetch data:", error);
+            setData([]);
         } finally {
-            setIsPayrollLoading(false);
+            setIsLoading(false);
         }
-    }, []);
+    }, [debouncedFilters, fetcher]);
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            setIsLoading(true);
-            try {
-                const statsResponse = await DashboardService.getDashboardStats();
-                if (statsResponse && statsResponse.ok) {
-                    setStats(statsResponse.data);
-                } else {
-                    setStats(null);
-                    console.warn("API dashboard-stats trả về không OK hoặc không có dữ liệu:", statsResponse);
-                }
-                await fetchPayrolls('', 1);
-            } catch (error) {
-                console.error("Lỗi khi tải dữ liệu dashboard tổng thể:", error);
-                setStats(null);
-            } finally {
-                setIsLoading(false);
+        fetchData();
+    }, [fetchData]);
+
+    return { data, isLoading, filters, setFilters };
+}
+
+
+// =================================================================
+// --- COMPONENT CHÍNH CỦA TRANG ---
+// =================================================================
+export default function AdminDashboardPage() {
+    return (
+        <div className="flex flex-col gap-8">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-800">Bảng điều khiển</h1>
+            <ProjectHealthSection />
+            <ProjectStatsSection />
+            <EmployeePerformanceSection />
+        </div>
+    );
+}
+
+
+// =================================================================
+// --- CÁC COMPONENT SECTION ---
+// =================================================================
+
+// --- SECTION 1: SỨC KHỎE DỰ ÁN ---
+function ProjectHealthSection() {
+    type HealthFilters = { keyword: string };
+    
+    const fetchFn = useCallback((filters: HealthFilters) => 
+        getProjectsHealthApi({
+            searchCondition: { keyword: filters.keyword },
+            pageInfo: { pageNum: 1, pageSize: 5 }
+        }), 
+    []);
+    const { data, isLoading, filters, setFilters } = useDashboardData<ProjectHealth, HealthFilters>(fetchFn, { keyword: '' });
+
+    return (
+        <DashboardCard
+            title="Sức khỏe Dự án"
+            description="Tổng quan nhanh về tiến độ các dự án đang hoạt động."
+            icon={<TrendingUp className="text-blue-500" />}
+            filterControls={
+                <Input
+                    placeholder="Tìm dự án..."
+                    value={filters.keyword}
+                    onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+                />
             }
-        };
+        >
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="w-[40%]">Tên dự án</TableHead>
+                        <TableHead>Trạng thái</TableHead>
+                        <TableHead>Tiến độ</TableHead>
+                        <TableHead className="text-center">Task</TableHead>
+                        <TableHead className="text-center">Member</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {isLoading ? <TableRowSkeleton cols={5} /> : data.map((p) => (
+                        <TableRow key={p._id}>
+                            <TableCell className="font-medium">{p.name}</TableCell>
+                            <TableCell><ProjectStatusBadge status={p.status} /></TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2">
+                                    <Progress value={p.progress_percentage} className="w-[80%]" />
+                                    <span className="text-xs font-semibold">{Math.round(p.progress_percentage)}%</span>
+                                </div>
+                            </TableCell>
+                            <TableCell className="text-center">{p.total_tasks}</TableCell>
+                            <TableCell className="text-center">{p.member_count}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </DashboardCard>
+    );
+}
 
-        fetchDashboardData();
-    }, [fetchPayrolls]);
+// --- SECTION 2: THỐNG KÊ CÔNG VIỆC ---
+function ProjectStatsSection() {
+    type StatsFilters = { keyword: string };
+    
+    const fetchFn = useCallback((filters: StatsFilters) => 
+        getProjectTaskStatsApi({
+            searchCondition: { keyword: filters.keyword },
+            pageInfo: { pageNum: 1, pageSize: 5 }
+        }),
+    []);
+    const { data, isLoading, filters, setFilters } = useDashboardData<ProjectTaskStat, StatsFilters>(fetchFn, { keyword: '' });
+    
+    return (
+        <DashboardCard
+            title="Thống kê Công việc"
+            description="Chi tiết số lượng công việc theo từng trạng thái của dự án."
+            icon={<BarChart2 className="text-green-500" />}
+            filterControls={
+                 <Input
+                    placeholder="Tìm dự án..."
+                    value={filters.keyword}
+                    onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+                />
+            }
+        >
+             <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="w-[40%]">Tên dự án</TableHead>
+                        <TableHead className="text-center text-green-500">Hoàn thành</TableHead>
+                        <TableHead className="text-center text-blue-500">Đang làm</TableHead>
+                        <TableHead className="text-center text-gray-500">Cần làm</TableHead>
+                        <TableHead className="text-center font-bold">Tổng</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {isLoading ? <TableRowSkeleton cols={5} /> : data.map((p) => (
+                        <TableRow key={p._id}>
+                            <TableCell className="font-medium">{p.name}</TableCell>
+                            <TableCell className="text-center font-semibold text-green-600">{p.done}</TableCell>
+                            <TableCell className="text-center font-semibold text-blue-600">{p.in_progress}</TableCell>
+                            <TableCell className="text-center font-semibold text-gray-600">{p.todo}</TableCell>
+                            <TableCell className="text-center font-extrabold">{p.total_tasks}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </DashboardCard>
+    );
+}
 
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setCurrentPage(1);
-            fetchPayrolls(searchTerm, 1);
-        }, 300);
+// --- SECTION 3: HIỆU SUẤT NHÂN VIÊN ---
+function EmployeePerformanceSection() {
+    type PerfFilters = { keyword: string; from: string; to: string };
+    
+    const fetchFn = useCallback((filters: PerfFilters) => 
+        getEmployeeAverageHoursApi({
+            searchCondition: { keyword: filters.keyword },
+            pageInfo: { pageNum: 1, pageSize: 5 },
+            date_from: filters.from || undefined,
+            date_to: filters.to || undefined
+        }),
+    []);
+    const { data, isLoading, filters, setFilters } = useDashboardData<EmployeeAvgHours, PerfFilters>(fetchFn, { keyword: '', from: '', to: '' });
 
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [searchTerm, fetchPayrolls]);
+    return (
+        <DashboardCard
+            title="Hiệu suất Nhân viên"
+            description="Giờ làm trung bình và số ngày làm việc của nhân viên."
+            icon={<Users className="text-purple-500" />}
+            filterControls={
+                <div className="flex gap-2">
+                    <Input
+                        placeholder="Tìm nhân viên..."
+                        value={filters.keyword}
+                        onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
+                        className="max-w-sm"
+                    />
+                    <Input type="date" value={filters.from} onChange={e => setFilters(prev => ({...prev, from: e.target.value}))} />
+                    <Input type="date" value={filters.to} onChange={e => setFilters(prev => ({...prev, to: e.target.value}))} />
+                </div>
+            }
+        >
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="w-[40%]">Nhân viên</TableHead>
+                        <TableHead>Vai trò</TableHead>
+                        <TableHead className="text-center">Số ngày làm</TableHead>
+                        <TableHead className="text-center">Giờ làm / ngày (TB)</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {isLoading ? <TableRowSkeleton cols={4} /> : data.map((emp) => (
+                        <TableRow key={emp._id}>
+                            <TableCell className="font-medium">{emp.full_name}</TableCell>
+                            <TableCell><Badge variant="outline">{emp.role}</Badge></TableCell>
+                            <TableCell className="text-center">{emp.total_days_worked}</TableCell>
+                            <TableCell className="text-center font-bold text-purple-600">{emp.average_hours.toFixed(2)}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </DashboardCard>
+    );
+}
 
-    const handleViewDetails = (payroll: any) => {
-        setSelectedPayroll(payroll);
-        setIsPopupOpen(true);
-    };
 
-    const handleClosePopup = () => {
-        setIsPopupOpen(false);
-        setSelectedPayroll(null);
-    };
+// =================================================================
+// --- CÁC COMPONENT HELPER (TÁI SỬ DỤNG) ---
+// =================================================================
 
-    if (isLoading) {
-        return <DashboardSkeleton />;
+interface DashboardCardProps {
+    title: string;
+    description: string;
+    icon: ReactNode;
+    filterControls: ReactNode;
+    children: ReactNode;
+}
+const DashboardCard: FC<DashboardCardProps> = ({ title, description, icon, filterControls, children }) => (
+    <Card className="shadow-sm hover:shadow-lg transition-shadow duration-300">
+        <CardHeader>
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <div>
+                    <CardTitle className="flex items-center gap-2 text-xl">{icon} {title}</CardTitle>
+                    <CardDescription className="mt-1">{description}</CardDescription>
+                </div>
+                <div className="md:w-auto w-full">{filterControls}</div>
+            </div>
+        </CardHeader>
+        <CardContent>{children}</CardContent>
+    </Card>
+);
+
+const ProjectStatusBadge: FC<{ status: string }> = ({ status }) => {
+    switch (status) {
+        case 'completed': return <Badge className="bg-green-600 text-white hover:bg-green-700">Hoàn thành</Badge>;
+        case 'in_progress': return <Badge variant="default">Đang chạy</Badge>;
+        case 'on_hold': return <Badge variant="secondary">Tạm dừng</Badge>;
+        case 'planning': return <Badge variant="outline">Lên kế hoạch</Badge>;
+        default: return <Badge variant="destructive">{status}</Badge>;
     }
+};
 
-    if (!stats) {
-        return <div className="text-center p-8 text-red-600">Không thể tải dữ liệu dashboard. Vui lòng thử lại sau.</div>;
-    }
-
-    return (
-        <div className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Tổng Nhân viên" value={(stats.employeeCount || 0) + (stats.adminCount || 0)} icon={<Users className="text-orange-500" />} />
-                <StatCard title="Dự án" value={stats.projectCount || 0} icon={<Package className="text-orange-500" />} />
-                <StatCard title="Công việc" value={stats.taskCount || 0} icon={<ClipboardList className="text-orange-500" />} />
-                <StatCard title="Tổng lương đã trả" value={formatCurrency(stats.totalSalaryPaid || 0)} icon={<Wallet className="text-orange-500" />} />
-            </div>
-
-            <div className="grid grid-cols-1">
-                <Card className="lg:col-span-1 border-orange-200">
-                    <CardHeader>
-                        <CardTitle className="text-orange-600">Bảng lương gần đây</CardTitle>
-                        <CardDescription>
-                            {isPayrollLoading ? "Đang tải..." : "5 bảng lương được tính toán gần nhất trong tháng."}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                            <Input
-                                placeholder="Tìm kiếm theo tên nhân viên..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-orange-300 focus:border-orange-500"
-                            />
-                        </div>
-
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="text-orange-500">Nhân viên</TableHead>
-                                    <TableHead className="text-right text-orange-500">Thực lãnh</TableHead>
-                                    <TableHead className="text-center text-orange-500">Hành động</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isPayrollLoading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center h-24 text-gray-500">Đang tải bảng lương...</TableCell>
-                                    </TableRow>
-                                ) : payrolls.length > 0 ? (
-                                    payrolls.map(p => (
-                                        <TableRow key={p._id}>
-                                            <TableCell>
-                                                <div className="font-medium text-gray-800">{p.user_id?.full_name || 'N/A'}</div>
-                                                <div className="text-xs text-muted-foreground">Tháng {p.month || 'N/A'}/{p.year || 'N/A'}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-semibold text-green-600">{formatCurrency(p.total_salary || 0)}</TableCell>
-                                            <TableCell className="text-center">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                                                    onClick={() => handleViewDetails(p)}
-                                                >
-                                                    Xem chi tiết
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center h-24 text-gray-500">
-                                            {searchTerm ? "Không tìm thấy kết quả phù hợp." : "Chưa có dữ liệu bảng lương trong tháng này."}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* POPUP XEM CHI TIẾT LƯƠNG ĐÃ ĐƯỢC GỌN HƠN */}
-            {selectedPayroll && (
-                <Dialog open={isPopupOpen} onOpenChange={setIsPopupOpen}>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle className="text-orange-600">Chi tiết lương tháng {selectedPayroll.month || 'N/A'}/{selectedPayroll.year || 'N/A'}</DialogTitle>
-                            <DialogDescription className="mt-1 text-gray-600">
-                                Lương của {selectedPayroll.user_id?.full_name || 'N/A'}.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-3 py-4 text-gray-700"> {/* Giảm gap cho gọn */}
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Email:</span>
-                                <span>{selectedPayroll.user_id?.email || 'N/A'}</span>
-                            </div>
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Vai trò:</span>
-                                <span>{selectedPayroll.user_id?.role || 'N/A'}</span>
-                            </div>
-                            <hr className="my-2 border-gray-200" /> {/* Giảm margin */}
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Ngày công:</span>
-                                <span>{selectedPayroll.working_days || 0} ngày</span> {/* Thêm đơn vị */}
-                            </div>
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Lương cơ bản/ngày:</span>
-                                <span>{formatCurrency(selectedPayroll.base_salary_per_day || 0)}</span>
-                            </div>
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Tổng lương cơ bản:</span>
-                                <span>{formatCurrency(selectedPayroll.base_salary || 0)}</span>
-                            </div>
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Thưởng chuyên cần:</span>
-                                <span>{formatCurrency(selectedPayroll.diligence_bonus || 0)}</span>
-                            </div>
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Thưởng hiệu suất:</span>
-                                <span>{formatCurrency(selectedPayroll.performance_bonus || 0)}</span>
-                            </div>
-                            <div className="grid grid-cols-2 items-center gap-2">
-                                <span className="font-semibold text-gray-800">Thưởng khác:</span>
-                                <span>{formatCurrency(selectedPayroll.other_bonus || 0)}</span>
-                            </div>
-                            <hr className="my-2 border-orange-300" /> {/* Đổi màu đường kẻ */}
-                            <div className="grid grid-cols-2 items-center gap-2 text-lg font-bold text-orange-700">
-                                <span>Thực lãnh:</span>
-                                <span>{formatCurrency(selectedPayroll.total_salary || 0)}</span>
-                            </div>
-                            <div className="grid grid-cols-2 items-center gap-2 text-sm text-muted-foreground">
-                                <span className="font-semibold">Ngày tạo bảng lương:</span>
-                                <span>{selectedPayroll.created_at ? new Date(selectedPayroll.created_at).toLocaleDateString('vi-VN') : 'N/A'}</span>
-                            </div>
-                        </div>
-                        <Button
-                            onClick={handleClosePopup}
-                            variant="secondary"
-                            className="w-full mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700"
-                        >
-                            Đóng
-                        </Button>
-                    </DialogContent>
-                </Dialog>
-            )}
-        </div>
-    );
-}
-
-// --- CÁC COMPONENT PHỤ GIỮ NGUYÊN ---
-function StatCard({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) {
-    return (
-        <Card className="border-orange-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-orange-600">{title}</CardTitle>
-                <div className="text-orange-500">{icon}</div>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{value}</div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function DashboardSkeleton() {
-    return (
-        <div className="space-y-8 p-4">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <Skeleton className="h-28" />
-                <Skeleton className="h-28" />
-                <Skeleton className="h-28" />
-                <Skeleton className="h-28" />
-            </div>
-            <div className="grid grid-cols-1">
-                <Skeleton className="h-[400px]" />
-            </div>
-        </div>
-    );
-}
+const TableRowSkeleton: FC<{ cols: number }> = ({ cols }) => (
+    <>
+        {Array.from({ length: 3 }).map((_, i) => (
+            <TableRow key={i}>
+                <TableCell colSpan={cols}>
+                    <Skeleton className="h-8 w-full" />
+                </TableCell>
+            </TableRow>
+        ))}
+    </>
+);
