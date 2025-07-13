@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, type FC, type ReactNode } from "react";
 import { useDebounce } from "use-debounce";
 import { format } from "date-fns";
-import { vi } from "date-fns/locale"; // Thêm locale tiếng Việt
-import { DateRange } from "react-day-picker"; // Thêm DateRange
-import { TrendingUp, Users, CalendarIcon, CheckCircle, ArrowRight } from "lucide-react";
+import { vi } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+import { TrendingUp, Users, CalendarIcon, CheckCircle, ArrowRight, ClipboardCheck } from "lucide-react";
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +18,14 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 // Services & Types
 import { getProjectsHealthApi, getEmployeeAverageHoursApi } from "@/services/admin.services";
 import type { ProjectHealth, EmployeeAvgHours } from "@/services/admin.services";
 
-// Custom Hook (không đổi)
+
 function useDashboardData<TData, TFilters>(
     fetcher: (filters: TFilters) => Promise<any>, 
     initialFilters: TFilters, 
@@ -48,7 +50,6 @@ function useDashboardData<TData, TFilters>(
     return { data, isLoading, filters, setFilters };
 }
 
-// Component chính (không đổi)
 export default function AdminDashboardPage() {
     return (
         <div className="flex flex-col gap-8">
@@ -59,7 +60,6 @@ export default function AdminDashboardPage() {
     );
 }
 
-// ProjectHealthSection (không đổi)
 function ProjectHealthSection() {
     type HealthFilters = { keyword: string };
     const fetchFn = useCallback((filters: HealthFilters) => 
@@ -114,12 +114,9 @@ function ProjectHealthSection() {
     );
 }
 
-
-// === SỬA LẠI EMPLOYEE PERFORMANCE SECTION ===
 function EmployeePerformanceSection() {
     type PerfFilters = { keyword: string; dateRange: DateRange | undefined };
     
-    // Mặc định là tháng hiện tại
     const defaultDateRange: DateRange = {
         from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         to: new Date()
@@ -148,7 +145,6 @@ function EmployeePerformanceSection() {
                         onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
                         className="max-w-sm"
                     />
-                    {/* <<< THAY THẾ 2 DATEPICKER BẰNG 1 DATERANGEPICKER >>> */}
                     <DateRangePicker 
                         date={filters.dateRange}
                         setDate={(range) => setFilters(prev => ({...prev, dateRange: range}))}
@@ -157,28 +153,45 @@ function EmployeePerformanceSection() {
             }
         >
             <Table>
-                 <TableHeader>
+                <TableHeader>
                     <TableRow>
                         <TableHead className="w-[40%]">Nhân viên</TableHead>
                         <TableHead className="text-center">Số ngày làm</TableHead>
-                        <TableHead className="text-center">Việc hoàn thành</TableHead>
+                        <TableHead className="text-center w-[25%]">Tỷ lệ hoàn thành (HT/Giao)</TableHead>
                         <TableHead className="text-center">Giờ làm / ngày (TB)</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {isLoading ? <TableRowSkeleton cols={4} /> : data.map((emp) => (
-                        <TableRow key={emp._id}>
-                            <TableCell className="font-medium">{emp.full_name}</TableCell>
-                            <TableCell className="text-center">{emp.total_days_worked}</TableCell>
-                            <TableCell className="text-center font-semibold text-green-600">
-                                <div className="flex items-center justify-center gap-1">
-                                    <CheckCircle className="h-4 w-4" />
-                                    {emp.completed_tasks_count || 0}
-                                </div>
-                            </TableCell>
-                            <TableCell className="text-center font-bold text-purple-600">{emp.average_hours.toFixed(2)}</TableCell>
-                        </TableRow>
-                    ))}
+                    {isLoading ? <TableRowSkeleton cols={4} /> : data.map((emp) => {
+                        const completionRate = emp.total_assigned_tasks_count > 0 
+                            ? (emp.completed_tasks_count / emp.total_assigned_tasks_count) * 100 
+                            : 0;
+                        
+                        return (
+                            <TableRow key={emp._id}>
+                                <TableCell className="font-medium">{emp.full_name}</TableCell>
+                                <TableCell className="text-center">{emp.total_days_worked}</TableCell>
+                                <TableCell className="text-center">
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <Progress value={completionRate} className="h-2" />
+                                                    <span className="text-xs font-semibold text-green-700">
+                                                        {emp.completed_tasks_count || 0} / {emp.total_assigned_tasks_count || 0}
+                                                    </span>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Hoàn thành {Math.round(completionRate)}% công việc được giao</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </TableCell>
+                                <TableCell className="text-center font-bold text-purple-600">{emp.average_hours.toFixed(2)}</TableCell>
+                            </TableRow>
+                        );
+                    })}
                 </TableBody>
             </Table>
         </DashboardCard>
@@ -187,7 +200,6 @@ function EmployeePerformanceSection() {
 
 // --- Helper Components ---
 
-// <<< THÊM COMPONENT DATE RANGE PICKER MỚI >>>
 interface DateRangePickerProps {
     date: DateRange | undefined;
     setDate: (date: DateRange | undefined) => void;
@@ -203,7 +215,7 @@ const DateRangePicker: FC<DateRangePickerProps> = ({ date, setDate, className })
                         variant={"outline"}
                         className={cn("w-full md:w-[320px] justify-start text-left font-normal", !date && "text-muted-foreground")}
                     >
-                        <CalendarIcon className="mr-1 h-4 w-6 " />
+                        <CalendarIcon className=" h-4 w-4" />
                         {date?.from ? (
                             date.to ? (
                                 <>
@@ -234,7 +246,6 @@ const DateRangePicker: FC<DateRangePickerProps> = ({ date, setDate, className })
         </div>
     );
 };
-
 
 interface DashboardCardProps {
     title: string;

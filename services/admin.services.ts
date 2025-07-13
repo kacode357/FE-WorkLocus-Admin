@@ -37,6 +37,7 @@ export interface EmployeeAvgHours {
     average_hours: number;
     total_days_worked: number;
     completed_tasks_count: number;
+     total_assigned_tasks_count: number;
 }
 
 const getEmployeeAverageHoursApi = async (payload: {
