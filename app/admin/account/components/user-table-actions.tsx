@@ -77,7 +77,7 @@ export function UserTableActions({ user, onActionComplete }: UserTableActionsPro
       <AlertDialog open={dialogs.block} onOpenChange={(open: boolean) => !open && closeDialog('block')}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Xác nhận khóa người dùng?</AlertDialogTitle></AlertDialogHeader>
-          <Label htmlFor="reason">Lý do khóa (không bắt buộc)</Label>
+          <Label htmlFor="reason">Lý do khóa (bắt buộc)</Label>
           <Input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} />
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>

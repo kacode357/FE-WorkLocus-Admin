@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback, type FC, type ReactNode } from "react";
 import { useDebounce } from "use-debounce";
-import { TrendingUp, BarChart2, Users } from "lucide-react";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale"; // Thêm locale tiếng Việt
+import { DateRange } from "react-day-picker"; // Thêm DateRange
+import { TrendingUp, Users, CalendarIcon, CheckCircle, ArrowRight } from "lucide-react";
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,15 +14,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 // Services & Types
-import { getProjectsHealthApi, getProjectTaskStatsApi, getEmployeeAverageHoursApi } from "@/services/admin.services";
-import type { ProjectHealth, ProjectTaskStat, EmployeeAvgHours } from "@/services/admin.services";
+import { getProjectsHealthApi, getEmployeeAverageHoursApi } from "@/services/admin.services";
+import type { ProjectHealth, EmployeeAvgHours } from "@/services/admin.services";
 
-
-// =================================================================
-// --- CUSTOM HOOK ĐỂ TÁI SỬ DỤNG LOGIC GỌI API ---
-// =================================================================
+// Custom Hook (không đổi)
 function useDashboardData<TData, TFilters>(
     fetcher: (filters: TFilters) => Promise<any>, 
     initialFilters: TFilters, 
@@ -34,50 +38,30 @@ function useDashboardData<TData, TFilters>(
         setIsLoading(true);
         try {
             const res = await fetcher(debouncedFilters);
-            if (res.ok) {
-                setData(res.data.records);
-            } else {
-                setData([]);
-            }
-        } catch (error) {
-            console.error("Failed to fetch data:", error);
-            setData([]);
-        } finally {
-            setIsLoading(false);
-        }
+            if (res.ok) setData(res.data.records); else setData([]);
+        } catch (error) { console.error("Failed to fetch data:", error); setData([]); } 
+        finally { setIsLoading(false); }
     }, [debouncedFilters, fetcher]);
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     return { data, isLoading, filters, setFilters };
 }
 
-
-// =================================================================
-// --- COMPONENT CHÍNH CỦA TRANG ---
-// =================================================================
+// Component chính (không đổi)
 export default function AdminDashboardPage() {
     return (
         <div className="flex flex-col gap-8">
             <h1 className="text-3xl font-bold tracking-tight text-gray-800">Bảng điều khiển</h1>
             <ProjectHealthSection />
-            <ProjectStatsSection />
             <EmployeePerformanceSection />
         </div>
     );
 }
 
-
-// =================================================================
-// --- CÁC COMPONENT SECTION ---
-// =================================================================
-
-// --- SECTION 1: SỨC KHỎE DỰ ÁN ---
+// ProjectHealthSection (không đổi)
 function ProjectHealthSection() {
     type HealthFilters = { keyword: string };
-    
     const fetchFn = useCallback((filters: HealthFilters) => 
         getProjectsHealthApi({
             searchCondition: { keyword: filters.keyword },
@@ -130,95 +114,54 @@ function ProjectHealthSection() {
     );
 }
 
-// --- SECTION 2: THỐNG KÊ CÔNG VIỆC ---
-function ProjectStatsSection() {
-    type StatsFilters = { keyword: string };
-    
-    const fetchFn = useCallback((filters: StatsFilters) => 
-        getProjectTaskStatsApi({
-            searchCondition: { keyword: filters.keyword },
-            pageInfo: { pageNum: 1, pageSize: 5 }
-        }),
-    []);
-    const { data, isLoading, filters, setFilters } = useDashboardData<ProjectTaskStat, StatsFilters>(fetchFn, { keyword: '' });
-    
-    return (
-        <DashboardCard
-            title="Thống kê Công việc"
-            description="Chi tiết số lượng công việc theo từng trạng thái của dự án."
-            icon={<BarChart2 className="text-green-500" />}
-            filterControls={
-                 <Input
-                    placeholder="Tìm dự án..."
-                    value={filters.keyword}
-                    onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-                />
-            }
-        >
-             <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-[40%]">Tên dự án</TableHead>
-                        <TableHead className="text-center text-green-500">Hoàn thành</TableHead>
-                        <TableHead className="text-center text-blue-500">Đang làm</TableHead>
-                        <TableHead className="text-center text-gray-500">Cần làm</TableHead>
-                        <TableHead className="text-center font-bold">Tổng</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {isLoading ? <TableRowSkeleton cols={5} /> : data.map((p) => (
-                        <TableRow key={p._id}>
-                            <TableCell className="font-medium">{p.name}</TableCell>
-                            <TableCell className="text-center font-semibold text-green-600">{p.done}</TableCell>
-                            <TableCell className="text-center font-semibold text-blue-600">{p.in_progress}</TableCell>
-                            <TableCell className="text-center font-semibold text-gray-600">{p.todo}</TableCell>
-                            <TableCell className="text-center font-extrabold">{p.total_tasks}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </DashboardCard>
-    );
-}
 
-// --- SECTION 3: HIỆU SUẤT NHÂN VIÊN ---
+// === SỬA LẠI EMPLOYEE PERFORMANCE SECTION ===
 function EmployeePerformanceSection() {
-    type PerfFilters = { keyword: string; from: string; to: string };
+    type PerfFilters = { keyword: string; dateRange: DateRange | undefined };
+    
+    // Mặc định là tháng hiện tại
+    const defaultDateRange: DateRange = {
+        from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        to: new Date()
+    };
     
     const fetchFn = useCallback((filters: PerfFilters) => 
         getEmployeeAverageHoursApi({
             searchCondition: { keyword: filters.keyword },
             pageInfo: { pageNum: 1, pageSize: 5 },
-            date_from: filters.from || undefined,
-            date_to: filters.to || undefined
+            date_from: filters.dateRange?.from ? format(filters.dateRange.from, 'yyyy-MM-dd') : undefined,
+            date_to: filters.dateRange?.to ? format(filters.dateRange.to, 'yyyy-MM-dd') : undefined
         }),
     []);
-    const { data, isLoading, filters, setFilters } = useDashboardData<EmployeeAvgHours, PerfFilters>(fetchFn, { keyword: '', from: '', to: '' });
+    const { data, isLoading, filters, setFilters } = useDashboardData<EmployeeAvgHours, PerfFilters>(fetchFn, { keyword: '', dateRange: defaultDateRange });
 
     return (
         <DashboardCard
             title="Hiệu suất Nhân viên"
-            description="Giờ làm trung bình và số ngày làm việc của nhân viên."
+            description="Giờ làm trung bình và các chỉ số hiệu suất khác của nhân viên."
             icon={<Users className="text-purple-500" />}
             filterControls={
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Input
                         placeholder="Tìm nhân viên..."
                         value={filters.keyword}
                         onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
                         className="max-w-sm"
                     />
-                    <Input type="date" value={filters.from} onChange={e => setFilters(prev => ({...prev, from: e.target.value}))} />
-                    <Input type="date" value={filters.to} onChange={e => setFilters(prev => ({...prev, to: e.target.value}))} />
+                    {/* <<< THAY THẾ 2 DATEPICKER BẰNG 1 DATERANGEPICKER >>> */}
+                    <DateRangePicker 
+                        date={filters.dateRange}
+                        setDate={(range) => setFilters(prev => ({...prev, dateRange: range}))}
+                    />
                 </div>
             }
         >
             <Table>
-                <TableHeader>
+                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-[40%]">Nhân viên</TableHead>
-                        <TableHead>Vai trò</TableHead>
                         <TableHead className="text-center">Số ngày làm</TableHead>
+                        <TableHead className="text-center">Việc hoàn thành</TableHead>
                         <TableHead className="text-center">Giờ làm / ngày (TB)</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -226,8 +169,13 @@ function EmployeePerformanceSection() {
                     {isLoading ? <TableRowSkeleton cols={4} /> : data.map((emp) => (
                         <TableRow key={emp._id}>
                             <TableCell className="font-medium">{emp.full_name}</TableCell>
-                            <TableCell><Badge variant="outline">{emp.role}</Badge></TableCell>
                             <TableCell className="text-center">{emp.total_days_worked}</TableCell>
+                            <TableCell className="text-center font-semibold text-green-600">
+                                <div className="flex items-center justify-center gap-1">
+                                    <CheckCircle className="h-4 w-4" />
+                                    {emp.completed_tasks_count || 0}
+                                </div>
+                            </TableCell>
                             <TableCell className="text-center font-bold text-purple-600">{emp.average_hours.toFixed(2)}</TableCell>
                         </TableRow>
                     ))}
@@ -237,10 +185,56 @@ function EmployeePerformanceSection() {
     );
 }
 
+// --- Helper Components ---
 
-// =================================================================
-// --- CÁC COMPONENT HELPER (TÁI SỬ DỤNG) ---
-// =================================================================
+// <<< THÊM COMPONENT DATE RANGE PICKER MỚI >>>
+interface DateRangePickerProps {
+    date: DateRange | undefined;
+    setDate: (date: DateRange | undefined) => void;
+    className?: string;
+}
+const DateRangePicker: FC<DateRangePickerProps> = ({ date, setDate, className }) => {
+    return (
+        <div className={cn("grid gap-2", className)}>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn("w-full md:w-[320px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                    >
+                        <CalendarIcon className="mr-1 h-4 w-6 " />
+                        {date?.from ? (
+                            date.to ? (
+                                <>
+                                    {format(date.from, "PP", { locale: vi })}
+                                    <ArrowRight className="mx-2 h-4 w-4"/>
+                                    {format(date.to, "PP", { locale: vi })}
+                                </>
+                            ) : (
+                                format(date.from, "PP", { locale: vi })
+                            )
+                        ) : (
+                            <span>Chọn khoảng ngày</span>
+                        )}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                        locale={vi}
+                    />
+                </PopoverContent>
+            </Popover>
+        </div>
+    );
+};
+
 
 interface DashboardCardProps {
     title: string;
