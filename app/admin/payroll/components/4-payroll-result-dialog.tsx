@@ -7,24 +7,44 @@ import { Separator } from "@/components/ui/separator";
 interface PayrollResultDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  payrollResult: any; // Kiểu dữ liệu của kết quả lương
+  payrollResult: any;
 }
 
 export function PayrollResultDialog({ isOpen, onOpenChange, payrollResult }: PayrollResultDialogProps) {
   if (!payrollResult) return null;
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0 }).format(amount);
+
+  const createdAt = payrollResult.created_at
+    ? new Date(payrollResult.created_at).toLocaleString("vi-VN", { hour12: false })
+    : "";
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl min-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Bảng lương chi tiết - Tháng {payrollResult.month}/{payrollResult.year}</DialogTitle>
+          <DialogTitle>
+            Bảng lương chi tiết - Tháng {payrollResult.month}/{payrollResult.year}
+          </DialogTitle>
           <DialogDescription>
-            Bảng lương cho nhân viên <strong>{payrollResult.user_id.full_name}</strong>.
+            Nhân viên: <strong>{payrollResult.user_id?.full_name}</strong>
+            {payrollResult.user_id?.email && (
+              <>
+                <br />
+                Email: <span className="text-muted-foreground">{payrollResult.user_id.email}</span>
+              </>
+            )}
+            {createdAt && (
+              <>
+                <br />
+                Ngày tạo: <span className="text-muted-foreground">{createdAt}</span>
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
+        <Separator className="my-3" />
+        <div className="py-2">
           <Table>
             <TableHeader>
               <TableRow>
@@ -45,19 +65,33 @@ export function PayrollResultDialog({ isOpen, onOpenChange, payrollResult }: Pay
                 <TableCell>Lương cơ bản</TableCell>
                 <TableCell className="text-right">{formatCurrency(payrollResult.base_salary)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell>Thưởng chuyên cần (yêu cầu {payrollResult.diligence_required_days} ngày)</TableCell>
-                <TableCell className="text-right text-green-600">+ {formatCurrency(payrollResult.diligence_bonus)}</TableCell>
-              </TableRow>
+              {"diligence_required_days" in payrollResult ? (
+                <TableRow>
+                  <TableCell>Thưởng chuyên cần (yêu cầu {payrollResult.diligence_required_days} ngày)</TableCell>
+                  <TableCell className="text-right text-green-600">
+                    + {formatCurrency(payrollResult.diligence_bonus)}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <TableRow>
+                  <TableCell>Thưởng chuyên cần</TableCell>
+                  <TableCell className="text-right text-green-600">
+                    + {formatCurrency(payrollResult.diligence_bonus)}
+                  </TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell>Thưởng/Phạt hiệu suất</TableCell>
                 <TableCell className={`text-right ${payrollResult.performance_bonus < 0 ? 'text-destructive' : 'text-green-600'}`}>
-                    {payrollResult.performance_bonus >= 0 ? '+ ' : ''}{formatCurrency(payrollResult.performance_bonus)}
+                  {payrollResult.performance_bonus >= 0 ? '+ ' : ''}
+                  {formatCurrency(payrollResult.performance_bonus)}
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>Phụ cấp khác</TableCell>
-                <TableCell className="text-right text-green-600">+ {formatCurrency(payrollResult.other_bonus)}</TableCell>
+                <TableCell className="text-right text-green-600">
+                  + {formatCurrency(payrollResult.other_bonus)}
+                </TableCell>
               </TableRow>
               <TableRow className="bg-muted font-bold text-lg">
                 <TableCell>TỔNG THỰC LÃNH</TableCell>
