@@ -200,7 +200,7 @@ export function PayrollCalculator({
                   <FormItem>
                     <FormLabel>
                       <input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
-                      {" "}Chỉ tính ngày có attendance
+                      {" "}Chỉ tính ngày có điểm danh (không cần chờ hết tháng)
                     </FormLabel>
                   </FormItem>
                 )}
